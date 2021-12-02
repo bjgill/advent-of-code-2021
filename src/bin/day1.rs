@@ -1,21 +1,25 @@
 use std::fs;
 
-fn main() {
-    let filename = "data/day1.1.txt";
+fn get_single_increase_count(mut readings: Vec<u32>) -> u32{
+    let mut readings= readings.iter_mut();
 
-    let input = fs::read_to_string(filename).unwrap();
-    let mut depth_readings = input.split("\n").map(|i| i.parse::<u32>().unwrap());
-
-    let mut previous_reading = depth_readings.next().unwrap();
+    let mut previous_reading = readings.next().unwrap();
     let mut increases = 0;
 
-    for reading in depth_readings {
-        println!("{}, {}", reading, previous_reading);
-
+    for reading in readings {
         if reading > previous_reading {
             increases += 1;
         }
         previous_reading = reading;
     }
-    println!("{}", increases);
+    increases
+}
+
+fn main() {
+    let filename = "data/day1.1.txt";
+
+    let input = fs::read_to_string(filename).unwrap();
+    let depth_readings: Vec<u32> = input.split("\n").map(|i| i.parse::<u32>().unwrap()).collect();
+
+    println!("Single increase count: {}", get_single_increase_count(depth_readings.clone()));
 }
