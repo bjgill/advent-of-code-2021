@@ -45,12 +45,40 @@ fn follow_route(instructions: Vec<Instruction>) -> Position {
     position
 }
 
+fn follow_aimed_route(instructions: Vec<Instruction>) -> Position {
+    let mut position: Position = (0, 0);
+    let mut aim = 0;
+
+    for (direction, distance) in instructions {
+        match direction {
+            Direction::Forward => {
+                position.0 += distance;
+                position.1 += aim * distance;
+            }
+            Direction::Down => aim += distance,
+            Direction::Up => aim -= distance,
+        }
+    }
+
+    position
+}
+
 fn main() {
     let input = std::fs::read_to_string("data/day2.txt").unwrap();
 
     let final_position = follow_route(parse_route(&input));
-    println!("Final position: {:?}", final_position);
-    println!("Product: {}", final_position.0 * final_position.1);
+    println!(
+        "Final position: {:?} => {}",
+        final_position,
+        final_position.0 * final_position.1
+    );
+
+    let final_aimed_position = follow_aimed_route(parse_route(&input));
+    println!(
+        "Final aimed position: {:?} => {}",
+        final_aimed_position,
+        final_aimed_position.0 * final_aimed_position.1
+    );
 }
 
 #[cfg(test)]
@@ -67,6 +95,22 @@ mod tests {
         assert_eq!(
             follow_route(vec![(Direction::Forward, 1), (Direction::Up, 2)]),
             (1, -2)
+        );
+    }
+
+    #[test]
+    fn test_follow_aimed_route() {
+        assert_eq!(follow_aimed_route(vec![]), (0, 0));
+        assert_eq!(follow_aimed_route(vec![(Direction::Forward, 1)]), (1, 0));
+        assert_eq!(follow_aimed_route(vec![(Direction::Up, 1)]), (0, 0));
+        assert_eq!(follow_aimed_route(vec![(Direction::Down, 1)]), (0, 0));
+        assert_eq!(
+            follow_aimed_route(vec![(Direction::Down, 2), (Direction::Forward, 3)]),
+            (3, 6)
+        );
+        assert_eq!(
+            follow_aimed_route(vec![(Direction::Up, 2), (Direction::Forward, 3)]),
+            (3, -6)
         );
     }
 
