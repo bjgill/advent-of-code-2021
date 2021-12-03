@@ -1,15 +1,13 @@
-const REPORT_LENGTH: usize = 12;
-
 #[derive(PartialEq, Debug)]
 struct Report<const L: usize>([bool; L]);
 
-fn parse_reports(input: &str) -> Vec<Report<REPORT_LENGTH>> {
+fn parse_reports<const L: usize>(input: &str) -> Vec<Report<L>> {
     input
         .split("\n")
         .map(|s| {
             Report(
                 s.chars()
-                    .take(REPORT_LENGTH)
+                    .take(L)
                     .map(|c| c == '1')
                     .collect::<Vec<_>>()
                     .try_into()
@@ -19,16 +17,16 @@ fn parse_reports(input: &str) -> Vec<Report<REPORT_LENGTH>> {
         .collect()
 }
 
-fn summarise(reports: Vec<Report<REPORT_LENGTH>>) -> [u32; REPORT_LENGTH] {
-    reports.iter().fold([0; REPORT_LENGTH], |mut acc, r| {
-        for i in 0..REPORT_LENGTH {
+fn summarise<const L: usize>(reports: Vec<Report<L>>) -> [u32; L] {
+    reports.iter().fold([0; L], |mut acc, r| {
+        for i in 0..L {
             acc[i] += r.0[i] as u32;
         }
         acc
     })
 }
 
-fn calculate_e_g(reports: Vec<Report<REPORT_LENGTH>>) -> (u32, u32) {
+fn calculate_e_g<const L: usize>(reports: Vec<Report<L>>) -> (u32, u32) {
     let report_count = reports.len().try_into().unwrap();
     let summary = summarise(reports);
 
@@ -38,14 +36,14 @@ fn calculate_e_g(reports: Vec<Report<REPORT_LENGTH>>) -> (u32, u32) {
         .collect();
 
     let epsilon = bits_to_u32(most_common_bits);
-    let gamma = 2u32.pow(REPORT_LENGTH as u32) - 1 - epsilon;
+    let gamma = 2u32.pow(L as u32) - 1 - epsilon;
 
     (epsilon, gamma)
 }
 
 fn bits_to_u32(bits: Vec<bool>) -> u32 {
     bits.iter()
-        .zip((0..REPORT_LENGTH).rev())
+        .zip((0..bits.len()).rev())
         .fold(0, |total, (bit, order)| {
             total + (*bit as u32) * 2u32.pow(order as u32)
         })
@@ -54,7 +52,7 @@ fn bits_to_u32(bits: Vec<bool>) -> u32 {
 fn main() {
     let input = std::fs::read_to_string("data/day3.txt").unwrap();
 
-    let (epsilon, gamma) = calculate_e_g(parse_reports(&input));
+    let (epsilon, gamma) = calculate_e_g(parse_reports::<12>(&input));
     println!("{:?}", epsilon * gamma);
 }
 
