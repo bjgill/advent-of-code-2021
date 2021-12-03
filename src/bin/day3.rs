@@ -1,9 +1,9 @@
 const REPORT_LENGTH: usize = 12;
 
 #[derive(PartialEq, Debug)]
-struct Report([bool; REPORT_LENGTH]);
+struct Report<const L: usize>([bool; L]);
 
-fn parse_reports(input: &str) -> Vec<Report> {
+fn parse_reports(input: &str) -> Vec<Report<REPORT_LENGTH>> {
     input
         .split("\n")
         .map(|s| {
@@ -19,7 +19,7 @@ fn parse_reports(input: &str) -> Vec<Report> {
         .collect()
 }
 
-fn summarise(reports: Vec<Report>) -> [u32; REPORT_LENGTH] {
+fn summarise(reports: Vec<Report<REPORT_LENGTH>>) -> [u32; REPORT_LENGTH] {
     reports.iter().fold([0; REPORT_LENGTH], |mut acc, r| {
         for i in 0..REPORT_LENGTH {
             acc[i] += r.0[i] as u32;
@@ -28,7 +28,7 @@ fn summarise(reports: Vec<Report>) -> [u32; REPORT_LENGTH] {
     })
 }
 
-fn calculate_e_g(reports: Vec<Report>) -> (u32, u32) {
+fn calculate_e_g(reports: Vec<Report<REPORT_LENGTH>>) -> (u32, u32) {
     let report_count = reports.len().try_into().unwrap();
     let summary = summarise(reports);
 
