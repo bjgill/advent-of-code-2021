@@ -60,6 +60,28 @@ fn main() {
 mod tests {
     use super::*;
 
+    const RAW_TEST_REPORT: &str = "00100
+11110
+10110
+10111
+10101
+01111
+00111
+11100
+10000
+11001
+00010
+01010";
+
+    fn get_test_reports() -> Vec<Report<5>> {
+        parse_reports::<5>(&RAW_TEST_REPORT)
+    }
+
+    #[test]
+    fn test_power_report() {
+        assert_eq!(calculate_e_g::<5>(get_test_reports()), (22, 9));
+    }
+
     #[test]
     fn test_parse() {
         assert_eq!(
