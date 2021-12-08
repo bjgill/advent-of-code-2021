@@ -1,7 +1,9 @@
+use std::collections::{BTreeSet, HashMap};
+
 #[derive(Debug, PartialEq)]
 struct Line {
-    signal: Vec<String>,
-    output: Vec<String>,
+    signal: Vec<BTreeSet<char>>,
+    output: Vec<BTreeSet<char>>,
 }
 
 impl From<String> for Line {
@@ -9,8 +11,14 @@ impl From<String> for Line {
         let (signal, output) = input.split_once(" | ").unwrap();
 
         Line {
-            signal: signal.split_whitespace().map(String::from).collect(),
-            output: output.split_whitespace().map(String::from).collect(),
+            signal: signal
+                .split_whitespace()
+                .map(|s| s.chars().collect())
+                .collect(),
+            output: output
+                .split_whitespace()
+                .map(|s| s.chars().collect())
+                .collect(),
         }
     }
 }
@@ -21,6 +29,75 @@ impl Line {
             .iter()
             .filter(|o| [2, 4, 3, 7].contains(&o.len()))
             .count()
+    }
+
+    fn decrypt_signal(&self) -> u32 {
+        let one = self.signal.iter().filter(|s| s.len() == 2).next().unwrap();
+        let four = self.signal.iter().filter(|s| s.len() == 4).next().unwrap();
+        let seven = self.signal.iter().filter(|s| s.len() == 3).next().unwrap();
+        let eight = self.signal.iter().filter(|s| s.len() == 7).next().unwrap();
+
+        let three = self
+            .signal
+            .iter()
+            .filter(|s| s.len() == 5 && s.intersection(one).count() == 2)
+            .next()
+            .unwrap();
+        let nine = self
+            .signal
+            .iter()
+            .filter(|s| {
+                s.len() == 6
+                    && s.intersection(one).count() == 2
+                    && s.intersection(four).count() == 4
+            })
+            .next()
+            .unwrap();
+
+        let six = self
+            .signal
+            .iter()
+            .filter(|s| s.len() == 6 && s.intersection(one).count() == 1 && s != &nine)
+            .next()
+            .unwrap();
+
+        let five = self
+            .signal
+            .iter()
+            .filter(|s| s.len() == 5 && s != &three && s.intersection(six).count() == 5)
+            .next()
+            .unwrap();
+
+        let two = self
+            .signal
+            .iter()
+            .filter(|s| s.len() == 5 && s != &three && s != &five)
+            .next()
+            .unwrap();
+        let zero = self
+            .signal
+            .iter()
+            .filter(|s| s.len() == 6 && s != &six && s != &nine)
+            .next()
+            .unwrap();
+
+        let mut mapping = HashMap::new();
+        mapping.insert(zero, 0);
+        mapping.insert(one, 1);
+        mapping.insert(two, 2);
+        mapping.insert(three, 3);
+        mapping.insert(four, 4);
+        mapping.insert(five, 5);
+        mapping.insert(six, 6);
+        mapping.insert(seven, 7);
+        mapping.insert(eight, 8);
+        mapping.insert(nine, 9);
+        let mapping = mapping;
+
+        mapping[&self.output[0]] * 1000
+            + mapping[&self.output[1]] * 100
+            + mapping[&self.output[2]] * 10
+            + mapping[&self.output[3]]
     }
 }
 
@@ -33,22 +110,16 @@ fn main() {
         "{} 1478s",
         lines.iter().map(Line::count_1478).sum::<usize>()
     );
+
+    println!(
+        "{} sum of outputs",
+        lines.iter().map(Line::decrypt_signal).sum::<u32>()
+    );
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_line_from_string() {
-        assert_eq!(
-            Line::from("be cfbegad | fdgacbe cefdb".to_string()),
-            Line {
-                signal: vec!["be".to_string(), "cfbegad".to_string()],
-                output: vec!["fdgacbe".to_string(), "cefdb".to_string()]
-            },
-        )
-    }
 
     #[test]
     fn test_counting_1478() {
@@ -76,5 +147,10 @@ mod tests {
             .collect();
 
         assert_eq!(lines.iter().map(Line::count_1478).sum::<usize>(), 26);
+    }
+
+    #[test]
+    fn test_mapping() {
+        assert_eq!(Line::from("acedgfb cdfbe gcdfa fbcad dab cefabd cdfgeb eafb cagedb ab | cdfeb fcadb cdfeb cdbaf".to_string()).decrypt_signal(), 5353);
     }
 }
