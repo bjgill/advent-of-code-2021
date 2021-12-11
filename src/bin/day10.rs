@@ -47,7 +47,7 @@ impl From<char> for Bracket {
     }
 }
 
-fn find_syntax_error(line: &str) -> Option<Bracket> {
+fn parse_stack_fragment(line: &str) -> Result<Vec<Bracket>, Bracket> {
     let mut stack = Vec::new();
 
     for c in line.chars() {
@@ -57,22 +57,38 @@ fn find_syntax_error(line: &str) -> Option<Bracket> {
             stack.push(bracket);
         } else {
             if !stack.pop().unwrap().closed_by(&bracket) {
-                return Some(bracket);
+                return Err(bracket);
             }
         }
     }
 
-    None
+    Ok(stack)
 }
 
 fn get_syntax_error_cost(line: &str) -> u32 {
-    match find_syntax_error(line) {
-        Some(Bracket::RightRound) => 3,
-        Some(Bracket::RightSquare) => 57,
-        Some(Bracket::RightBrace) => 1197,
-        Some(Bracket::RightAngle) => 25137,
+    match parse_stack_fragment(line) {
+        Err(Bracket::RightRound) => 3,
+        Err(Bracket::RightSquare) => 57,
+        Err(Bracket::RightBrace) => 1197,
+        Err(Bracket::RightAngle) => 25137,
         _ => 0,
     }
+}
+
+fn get_completion_cost(line: &str) -> Result<u64, Bracket> {
+    Ok(parse_stack_fragment(line)?
+        .into_iter()
+        .rev()
+        .fold(0, |acc, bracket| {
+            acc * 5
+                + match bracket {
+                    Bracket::LeftRound => 1,
+                    Bracket::LeftSquare => 2,
+                    Bracket::LeftBrace => 3,
+                    Bracket::LeftAngle => 4,
+                    _ => panic!("Unexpected bracket in stack remnant"),
+                }
+        }))
 }
 
 fn main() {
@@ -84,6 +100,15 @@ fn main() {
             .map(|line| get_syntax_error_cost(line))
             .sum::<u32>()
     );
+
+    let mut completions: Vec<u64> = data
+        .split('\n')
+        .map(|line| get_completion_cost(line))
+        .filter_map(Result::ok)
+        .collect();
+    completions.sort();
+
+    println!("{:?}", completions[completions.len() / 2]);
 }
 
 #[cfg(test)]
@@ -93,10 +118,21 @@ mod tests {
     #[test]
     fn test_parse_line() {
         assert_eq!(
-            find_syntax_error("{([(<{}[<>[]}>{[]{[(<()>"),
-            Some(Bracket::RightBrace)
+            parse_stack_fragment("{([(<{}[<>[]}>{[]{[(<()>"),
+            Err(Bracket::RightBrace)
         );
 
-        assert_eq!(find_syntax_error("{}()<<>>"), None);
+        assert_eq!(parse_stack_fragment("{}()<<>>"), Ok(vec![]));
+        assert_eq!(
+            parse_stack_fragment("{}()<<"),
+            Ok(vec![Bracket::LeftAngle, Bracket::LeftAngle])
+        );
+    }
+
+    #[test]
+    fn test_completion_cost() {
+        assert_eq!(get_completion_cost("[({(<(())[]>[[{[]{<()<>>"), Ok(288957));
+
+        assert_eq!(get_completion_cost("<{([{{}}[<[[[<>{}]]]>[]]"), Ok(294));
     }
 }
