@@ -1,3 +1,7 @@
+use std::collections::HashSet;
+
+type Point = (usize, usize, u8);
+
 #[derive(Debug, PartialEq)]
 struct HeightMap {
     heights: Vec<Vec<u8>>,
@@ -12,27 +16,39 @@ impl HeightMap {
         self.heights[0].len()
     }
 
-    fn is_low_point(&self, x: usize, y: usize) -> Option<u8> {
-        let height = self.heights[x][y];
+    fn get_adjacent_points(&self, x: usize, y: usize) -> HashSet<Point> {
+        let mut adjacents = HashSet::new();
 
-        if x >= 1 && self.heights[x - 1][y] <= height {
-            return None;
+        if x >= 1 {
+            adjacents.insert((x - 1, y, self.heights[x - 1][y]));
         }
-        if x < self.max_x() - 1 && self.heights[x + 1][y] <= height {
-            return None;
-        }
-
-        if y >= 1 && self.heights[x][y - 1] <= height {
-            return None;
-        }
-        if y < self.max_y() - 1 && self.heights[x][y + 1] <= height {
-            return None;
+        if x < self.max_x() - 1 {
+            adjacents.insert((x + 1, y, self.heights[x + 1][y]));
         }
 
-        Some(height)
+        if y >= 1 {
+            adjacents.insert((x, y - 1, self.heights[x][y - 1]));
+        }
+        if y < self.max_y() - 1 {
+            adjacents.insert((x, y + 1, self.heights[x][y + 1]));
+        }
+
+        adjacents
     }
 
-    fn find_low_points(&self) -> Vec<u8> {
+    fn is_low_point(&self, x: usize, y: usize) -> Option<Point> {
+        let height = self.heights[x][y];
+
+        for (_, _, adjacent_height) in self.get_adjacent_points(x, y) {
+            if height >= adjacent_height {
+                return None;
+            }
+        }
+
+        Some((x, y, height))
+    }
+
+    fn find_low_points(&self) -> Vec<Point> {
         (0..self.max_x())
             .flat_map(|x| (0..self.max_y()).filter_map(move |y| self.is_low_point(x, y)))
             .collect()
@@ -41,8 +57,39 @@ impl HeightMap {
     fn get_risk_level_sum(&self) -> u32 {
         self.find_low_points()
             .into_iter()
-            .map(|p| 1 + p as u32)
+            .map(|p| 1 + p.2 as u32)
             .sum()
+    }
+
+    fn get_basin_for_low_point(&self, low_point: Point) -> HashSet<Point> {
+        let mut basin = HashSet::new();
+        basin.insert(low_point);
+
+        for height in (low_point.2 + 1)..9 {
+            for basin_point in basin.clone() {
+                for adjacent_point in self.get_adjacent_points(basin_point.0, basin_point.1) {
+                    if adjacent_point.2 == height && !basin.contains(&adjacent_point) {
+                        basin.insert(adjacent_point);
+                    }
+                }
+            }
+        }
+
+        basin
+    }
+
+    fn get_three_largest_basin_sizes(&self) -> usize {
+        let mut basins: Vec<_> = self
+            .find_low_points()
+            .into_iter()
+            .map(|l| self.get_basin_for_low_point(l))
+            .map(|basin| basin.len())
+            .collect();
+
+        basins.sort();
+        basins.reverse();
+
+        basins[0] * basins[1] * basins[2]
     }
 }
 
@@ -62,6 +109,11 @@ fn main() {
     let map = HeightMap::from(data);
 
     println!("Sum of risk levels: {}", map.get_risk_level_sum());
+
+    println!(
+        "Product of three largest basins: {}",
+        map.get_three_largest_basin_sizes()
+    );
 }
 
 #[cfg(test)]
@@ -82,7 +134,7 @@ mod tests {
     fn test_is_low_point() {
         let height_map = HeightMap::from("12\n34".to_string());
 
-        assert_eq!(height_map.is_low_point(0, 0), Some(1));
+        assert_eq!(height_map.is_low_point(0, 0), Some((0, 0, 1)));
         assert_eq!(height_map.is_low_point(1, 0), None);
         assert_eq!(height_map.is_low_point(0, 1), None);
         assert_eq!(height_map.is_low_point(1, 1), None);
@@ -92,7 +144,7 @@ mod tests {
     fn test_find_low_points() {
         assert_eq!(
             HeightMap::from("12\n34".to_string()).find_low_points(),
-            vec![1]
+            vec![(0, 0, 1)]
         );
     }
 
@@ -122,5 +174,19 @@ mod tests {
         );
 
         assert_eq!(map.get_risk_level_sum(), 24);
+    }
+
+    #[test]
+    fn test_get_basin() {
+        let map = HeightMap::from(
+            "2199943210
+3987894921
+9856789892
+8767896789
+9899965678"
+                .to_string(),
+        );
+
+        assert_eq!(map.get_basin_for_low_point((0, 9, 0)).len(), 9);
     }
 }
