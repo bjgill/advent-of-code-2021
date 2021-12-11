@@ -64,7 +64,7 @@ fn follow_aimed_route(instructions: Vec<Instruction>) -> Position {
 }
 
 fn main() {
-    let input = std::fs::read_to_string("data/day2.txt").unwrap();
+    let input = std::fs::read_to_string("data/day02.txt").unwrap();
 
     let final_position = follow_route(parse_route(&input));
     println!(

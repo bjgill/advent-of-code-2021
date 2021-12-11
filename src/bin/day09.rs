@@ -105,7 +105,7 @@ impl From<String> for HeightMap {
 }
 
 fn main() {
-    let data = std::fs::read_to_string("data/day9.txt").unwrap();
+    let data = std::fs::read_to_string("data/day09.txt").unwrap();
     let map = HeightMap::from(data);
 
     println!("Sum of risk levels: {}", map.get_risk_level_sum());

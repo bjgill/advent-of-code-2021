@@ -30,7 +30,7 @@ fn get_triple_increase_count(readings: Vec<u32>) -> u32 {
 }
 
 fn main() {
-    let filename = "data/day1.txt";
+    let filename = "data/day01.txt";
 
     let input = fs::read_to_string(filename).unwrap();
     let depth_readings: Vec<u32> = input

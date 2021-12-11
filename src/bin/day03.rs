@@ -106,7 +106,7 @@ fn get_co2_scrubber_rating<const L: usize>(reports: Vec<Report<L>>) -> u32 {
 }
 
 fn main() {
-    let input = std::fs::read_to_string("data/day3.txt").unwrap();
+    let input = std::fs::read_to_string("data/day03.txt").unwrap();
     let reports = parse_reports::<12>(&input);
 
     let (epsilon, gamma) = calculate_e_g(reports.clone());

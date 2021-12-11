@@ -113,7 +113,7 @@ fn play_boards_to_last_victory(called_numbers: &[u32], bingo_boards: &[Bingo]) {
 }
 
 fn main() {
-    let input = std::fs::read_to_string("data/day4.txt").unwrap();
+    let input = std::fs::read_to_string("data/day04.txt").unwrap();
     let mut input_entries = input.split_whitespace();
 
     let called_numbers: Vec<u32> = input_entries

@@ -134,7 +134,7 @@ fn get_overlapping_lines(lines: Vec<Line>) -> usize {
 }
 
 fn main() {
-    let input = std::fs::read_to_string("data/day5.txt").unwrap();
+    let input = std::fs::read_to_string("data/day05.txt").unwrap();
 
     println!("{}", get_overlapping_orthogonal_lines(parse_lines(&input)));
     println!("{}", get_overlapping_lines(parse_lines(&input)));

@@ -102,7 +102,7 @@ impl Line {
 }
 
 fn main() {
-    let data = std::fs::read_to_string("data/day8.txt").unwrap();
+    let data = std::fs::read_to_string("data/day08.txt").unwrap();
 
     let lines: Vec<Line> = data.split('\n').map(String::from).map(Line::from).collect();
 

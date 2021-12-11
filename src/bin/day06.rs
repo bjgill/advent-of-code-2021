@@ -124,7 +124,7 @@ fn parse_fish(fish_input: &str) -> Vec<u64> {
 }
 
 fn main() {
-    let input = std::fs::read_to_string("data/day6.txt").unwrap();
+    let input = std::fs::read_to_string("data/day06.txt").unwrap();
     let starting_shoal = Shoal::from(input);
 
     println!("{} starting fish", starting_shoal.count());

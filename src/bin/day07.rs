@@ -38,7 +38,7 @@ fn minimal_triangular_fuel(crabs: Vec<i32>) -> i32 {
 }
 
 fn main() {
-    let input = std::fs::read_to_string("data/day7.txt").unwrap();
+    let input = std::fs::read_to_string("data/day07.txt").unwrap();
     let crabs: Vec<i32> = input.split(',').map(|c| c.parse().unwrap()).collect();
 
     println!(
