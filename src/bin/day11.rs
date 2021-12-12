@@ -177,7 +177,10 @@ fn main() {
         cavern.clone().step_times(100).flash_count
     );
 
-    println!("Synchronises after {} steps", cavern.steps_until_synchronised());
+    println!(
+        "Synchronises after {} steps",
+        cavern.steps_until_synchronised()
+    );
 }
 
 #[cfg(test)]
