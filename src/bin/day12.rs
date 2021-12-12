@@ -44,6 +44,51 @@ impl CaveNetwork {
     fn get_path_count(&self) -> usize {
         self.extend_paths(vec!["start".to_string()]).len()
     }
+
+    fn path_has_small_cave_repeat(&self, input_path: &[String]) -> bool {
+        for i in 0..input_path.len() {
+            let element = &self.0[&input_path[i]];
+
+            match element {
+                Node::BigCave { .. } | Node::End | Node::Start { .. } => continue,
+                Node::SmallCave { .. } => {
+                    if input_path[i + 1..].contains(&input_path[i]) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn extend_paths_with_one_repeat(&self, input_path: Vec<String>) -> Vec<Vec<String>> {
+        let current_node = &self.0[input_path.last().unwrap()];
+        let path_repeats = self.path_has_small_cave_repeat(&input_path);
+
+        match current_node {
+            Node::Start { adjacents }
+            | Node::BigCave { adjacents }
+            | Node::SmallCave { adjacents } => adjacents
+                .iter()
+                .filter(|next_node| match &self.0[*next_node] {
+                    Node::BigCave { .. } | Node::End => true,
+                    Node::Start { .. } => false,
+                    Node::SmallCave { .. } => !(input_path.contains(next_node) && path_repeats),
+                })
+                .flat_map(|a| {
+                    let mut path = input_path.clone();
+                    path.push(a.to_string());
+                    self.extend_paths_with_one_repeat(path)
+                })
+                .collect(),
+            Node::End => vec![input_path],
+        }
+    }
+
+    fn get_path_with_one_repeat_count(&self) -> usize {
+        self.extend_paths_with_one_repeat(vec!["start".to_string()])
+            .len()
+    }
 }
 
 impl From<&str> for CaveNetwork {
@@ -106,6 +151,7 @@ fn main() {
     let cave_network = CaveNetwork::from(data.as_str());
 
     println!("{} possible paths", cave_network.get_path_count());
+    println!("{} possible paths with one repeated small cave", cave_network.get_path_with_one_repeat_count());
 }
 
 #[cfg(test)]
@@ -131,7 +177,7 @@ mod tests {
         cave_network.add_node_pair("start", "MIDDLE");
         cave_network.add_node_pair("MIDDLE", "end");
 
-        assert_eq!(cave_network.get_path_count(), 1,);
+        assert_eq!(cave_network.get_path_count(), 1);
     }
 
     #[test]
@@ -141,7 +187,7 @@ mod tests {
         cave_network.add_node_pair("start", "middle");
         cave_network.add_node_pair("middle", "end");
 
-        assert_eq!(cave_network.get_path_count(), 1,);
+        assert_eq!(cave_network.get_path_count(), 1);
     }
 
     #[test]
@@ -156,7 +202,8 @@ A-end
 b-end",
         );
 
-        assert_eq!(cave_network.get_path_count(), 10,);
+        assert_eq!(cave_network.get_path_count(), 10);
+        assert_eq!(cave_network.get_path_with_one_repeat_count(), 36);
     }
 
     #[test]
@@ -182,6 +229,7 @@ pj-fs
 start-RW",
         );
 
-        assert_eq!(cave_network.get_path_count(), 226,);
+        assert_eq!(cave_network.get_path_count(), 226);
+        assert_eq!(cave_network.get_path_with_one_repeat_count(), 3509);
     }
 }
