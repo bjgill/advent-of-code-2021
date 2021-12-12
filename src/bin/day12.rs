@@ -151,7 +151,10 @@ fn main() {
     let cave_network = CaveNetwork::from(data.as_str());
 
     println!("{} possible paths", cave_network.get_path_count());
-    println!("{} possible paths with one repeated small cave", cave_network.get_path_with_one_repeat_count());
+    println!(
+        "{} possible paths with one repeated small cave",
+        cave_network.get_path_with_one_repeat_count()
+    );
 }
 
 #[cfg(test)]
