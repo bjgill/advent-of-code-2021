@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::fmt;
 
 #[derive(PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 struct Point {
@@ -47,6 +48,35 @@ impl Paper {
                 })
                 .collect(),
         )
+    }
+
+    fn max_x(&self) -> usize {
+        self.0.iter().map(|p| p.x).max().unwrap()
+    }
+
+    fn max_y(&self) -> usize {
+        self.0.iter().map(|p| p.y).max().unwrap()
+    }
+}
+
+impl fmt::Display for Paper {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for y in 0..=self.max_y() {
+            for x in 0..=self.max_x() {
+                write!(
+                    f,
+                    "{}",
+                    if self.0.contains(&Point { x, y }) {
+                        "#"
+                    } else {
+                        " "
+                    }
+                )?;
+            }
+            write!(f, "\n")?;
+        }
+
+        write!(f, "\n")
     }
 }
 
@@ -97,6 +127,12 @@ fn main() {
 
     paper = paper.fold_with(folds.remove(0));
     println!("{} visible dots after 1 fold", paper.get_visible_dots());
+
+    for fold in folds {
+        paper = paper.fold_with(fold)
+    }
+
+    print!("{}", paper);
 }
 
 #[cfg(test)]
