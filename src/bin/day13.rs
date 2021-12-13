@@ -20,6 +20,36 @@ impl From<String> for Point {
 #[derive(PartialEq, Debug)]
 struct Paper(BTreeSet<Point>);
 
+impl Paper {
+    fn get_visible_dots(&self) -> usize {
+        self.0.len()
+    }
+
+    fn fold_with(self, fold: Fold) -> Self {
+        Self(
+            self.0
+                .into_iter()
+                .map(|mut point| {
+                    match fold {
+                        Fold::X(fold_index) => {
+                            if point.x > fold_index {
+                                point.x = 2 * fold_index - point.x;
+                            }
+                        }
+                        Fold::Y(fold_index) => {
+                            if point.y > fold_index {
+                                point.y = 2 * fold_index - point.y;
+                            }
+                        }
+                    }
+
+                    point
+                })
+                .collect(),
+        )
+    }
+}
+
 #[derive(PartialEq, Debug)]
 enum Fold {
     X(usize),
@@ -61,7 +91,13 @@ fn parse_input(input: &str) -> (Paper, Vec<Fold>) {
     )
 }
 
-fn main() {}
+fn main() {
+    let data = std::fs::read_to_string("data/day13.txt").unwrap();
+    let (mut paper, mut folds) = parse_input(&data);
+
+    paper = paper.fold_with(folds.remove(0));
+    println!("{} visible dots after 1 fold", paper.get_visible_dots());
+}
 
 #[cfg(test)]
 mod tests {
@@ -76,5 +112,37 @@ mod tests {
                 vec![Fold::Y(7)]
             )
         );
+    }
+
+    #[test]
+    fn test_example() {
+        let input = "6,10
+0,14
+9,10
+0,3
+10,4
+4,11
+6,0
+6,12
+4,1
+0,13
+10,12
+3,4
+3,0
+8,4
+1,10
+2,14
+8,10
+9,0
+
+fold along y=7
+fold along x=5";
+
+        let (mut paper, mut folds) = parse_input(input);
+
+        assert_eq!(paper.get_visible_dots(), 18);
+
+        paper = paper.fold_with(folds.remove(0));
+        assert_eq!(paper.get_visible_dots(), 17);
     }
 }
