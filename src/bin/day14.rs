@@ -46,32 +46,83 @@ impl Polymer {
             self.0.insert(2 * i + 1, rules.apply(a, b));
         }
     }
+}
+
+type Pair = (char, char);
+
+#[derive(Debug, PartialEq)]
+struct BulkPolymer(HashMap<Pair, u64>);
+
+impl From<String> for BulkPolymer {
+    fn from(input: String) -> BulkPolymer {
+        let mut counter = HashMap::new();
+
+        input
+            .chars()
+            .collect::<Vec<_>>()
+            .windows(2)
+            .for_each(|window| {
+                *counter
+                    .entry((
+                        window.first().unwrap().to_owned(),
+                        window.last().unwrap().to_owned(),
+                    ))
+                    .or_insert(0) += 1
+            });
+
+        BulkPolymer(counter)
+    }
+}
+
+impl BulkPolymer {
+    fn step(&mut self, rules: &PolymerisationRules) {
+        let mut new_counter = HashMap::new();
+
+        for (pair, count) in &self.0 {
+            let middle = rules.apply(pair.0, pair.1);
+
+            *new_counter.entry((pair.0, middle)).or_insert(0) += count;
+            *new_counter.entry((middle, pair.1)).or_insert(0) += count;
+        }
+
+        self.0 = new_counter;
+    }
 
     fn step_times(&mut self, rules: &PolymerisationRules, times: u32) {
         for _ in 0..times {
-            self.step(&rules);
+            self.step(rules);
         }
     }
 
-    /// It's easiest to do this manually by inspection.
     fn count_elements(&self) {
-        let mut counter = HashMap::new();
+        let mut char_counter = HashMap::new();
 
-        self.0.iter().for_each(|c| {*counter.entry(c).or_insert(0) += 1;});
+        for ((a, b), count) in &self.0 {
+            *char_counter.entry(a).or_insert(0) += count;
+            *char_counter.entry(b).or_insert(0) += count;
+        }
 
-        println!("Element counts: {:?}", counter);
+        let min = char_counter.iter().min_by_key(|&(_, count)| count).unwrap();
+        let max = char_counter.iter().max_by_key(|&(_, count)| count).unwrap();
+
+        // We're technically double-counting the first and last characters in the string. However, thanks to rounding during the division, it all washes out.
+        println!("Min: {} x {}", min.0, min.1 / 2);
+        println!("max: {} x {}", max.0, max.1 / 2);
+        println!("Difference: {}", max.1 / 2 - min.1 / 2);
     }
 }
 
 fn main() {
     let data = std::fs::read_to_string("data/day14.txt").unwrap();
-    let (start, rules) = data.split_once("\n\n").unwrap();
+    let (polymer, rules) = data.split_once("\n\n").unwrap();
 
-    let mut polymer = Polymer(start.chars().collect());
+    let mut polymer = BulkPolymer::from(polymer.to_string());
     let rules = PolymerisationRules::from(rules.to_string());
 
     polymer.step_times(&rules, 10);
+    polymer.count_elements();
 
+    polymer.step_times(&rules, 30);
     polymer.count_elements();
 }
 
@@ -119,5 +170,17 @@ CN -> C"
 
         polymer.step(&rules);
         assert_eq!(polymer, Polymer("NBCCNBBBCBHCB".chars().collect()));
+    }
+
+    #[test]
+    fn test_parse_bulk_polymer() {
+        let mut expected_polymer = HashMap::new();
+        expected_polymer.insert(('a', 'b'), 1);
+        expected_polymer.insert(('b', 'c'), 1);
+
+        assert_eq!(
+            BulkPolymer::from("abc".to_string()),
+            BulkPolymer(expected_polymer)
+        );
     }
 }
