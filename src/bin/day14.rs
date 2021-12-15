@@ -38,6 +38,7 @@ impl PolymerisationRules {
 struct Polymer(Vec<char>);
 
 impl Polymer {
+    #[allow(dead_code)]
     fn step(&mut self, rules: &PolymerisationRules) {
         for i in 0..self.0.len() - 1 {
             let a = self.0[2 * i];
