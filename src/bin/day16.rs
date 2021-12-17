@@ -40,6 +40,43 @@ impl Message {
                 }
             }
     }
+
+    fn get_value(&self) -> u64 {
+        match &self.contents {
+            MessageContents::Sum(subpackets) => subpackets.iter().map(|s| s.get_value()).sum(),
+            MessageContents::Product(subpackets) => {
+                subpackets.iter().map(|s| s.get_value()).product()
+            }
+            MessageContents::Minimum(subpackets) => {
+                subpackets.iter().map(|s| s.get_value()).min().unwrap()
+            }
+            MessageContents::Maximum(subpackets) => {
+                subpackets.iter().map(|s| s.get_value()).max().unwrap()
+            }
+            MessageContents::Literal(l) => *l,
+            MessageContents::GreaterThan(packet1, packet2) => {
+                if packet1.get_value() > packet2.get_value() {
+                    1
+                } else {
+                    0
+                }
+            }
+            MessageContents::LessThan(packet1, packet2) => {
+                if packet1.get_value() < packet2.get_value() {
+                    1
+                } else {
+                    0
+                }
+            }
+            MessageContents::EqualTo(packet1, packet2) => {
+                if packet1.get_value() == packet2.get_value() {
+                    1
+                } else {
+                    0
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -176,11 +213,10 @@ fn parse_message(input: &str) -> IResult<&str, Message> {
 fn main() {
     let data = std::fs::read_to_string("data/day16.txt").unwrap();
     let message_string = convert_to_bits(data);
+    let message = parse_message(&message_string).unwrap().1;
 
-    println!(
-        "Version sum: {}",
-        parse_message(&message_string).unwrap().1.get_version_sum()
-    );
+    println!("Version sum: {}", message.get_version_sum());
+    println!("Value: {}", message.get_value());
 }
 
 #[cfg(test)]
@@ -328,5 +364,30 @@ mod tests {
             true
         );
         assert_eq!(message.get_version_sum(), 16);
+    }
+
+    #[test]
+    fn test_value() {
+        assert_eq!(
+            parse_message(&convert_to_bits("C200B40A82"))
+                .unwrap()
+                .1
+                .get_value(),
+            3
+        );
+        assert_eq!(
+            parse_message(&convert_to_bits("04005AC33890"))
+                .unwrap()
+                .1
+                .get_value(),
+            54
+        );
+        assert_eq!(
+            parse_message(&convert_to_bits("9C0141080250320F1802104A08"))
+                .unwrap()
+                .1
+                .get_value(),
+            1
+        );
     }
 }
