@@ -1,6 +1,6 @@
 use nom::{
     bytes::complete::{tag, take},
-    combinator::{cond, eof},
+    combinator::{cond, eof, fail},
     multi::{many1, many_m_n, many_till},
     sequence::preceded,
     sequence::tuple,
@@ -19,46 +19,39 @@ fn convert_to_bits<S: Into<String>>(input: S) -> String {
 #[derive(Debug, PartialEq, Clone)]
 struct Message {
     version: u8,
-    package_type: MessageType,
     contents: MessageContents,
 }
 
 impl Message {
-    fn get_as_literal(&self) -> Option<u64> {
-        match self.contents {
-            MessageContents::Literal(l) => Some(l),
-            _ => None,
-        }
-    }
-
-    fn get_subpackets(&self) -> Option<Vec<Message>> {
-        match &self.contents {
-            MessageContents::SubPackets(s) => Some(s.clone()),
-            _ => None,
-        }
-    }
-
     fn get_version_sum(&self) -> u64 {
         self.version as u64
             + match &self.contents {
                 MessageContents::Literal(_) => 0,
-                MessageContents::SubPackets(subpackets) => {
+                MessageContents::Sum(subpackets)
+                | MessageContents::Product(subpackets)
+                | MessageContents::Minimum(subpackets)
+                | MessageContents::Maximum(subpackets) => {
                     subpackets.iter().map(|s| s.get_version_sum()).sum()
+                }
+                MessageContents::GreaterThan(message1, message2)
+                | MessageContents::LessThan(message1, message2)
+                | MessageContents::EqualTo(message1, message2) => {
+                    message1.get_version_sum() + message2.get_version_sum()
                 }
             }
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
-enum MessageType {
-    Literal,
-    Operator(u8),
-}
-
-#[derive(Debug, PartialEq, Clone)]
 enum MessageContents {
+    Sum(Vec<Message>),
+    Product(Vec<Message>),
+    Minimum(Vec<Message>),
+    Maximum(Vec<Message>),
     Literal(u64),
-    SubPackets(Vec<Message>),
+    GreaterThan(Box<Message>, Box<Message>),
+    LessThan(Box<Message>, Box<Message>),
+    EqualTo(Box<Message>, Box<Message>),
 }
 
 fn take_version(s: &str) -> IResult<&str, u8> {
@@ -67,16 +60,8 @@ fn take_version(s: &str) -> IResult<&str, u8> {
     Ok((input, u8::from_str_radix(version, 2).unwrap()))
 }
 
-fn take_package_type(s: &str) -> IResult<&str, MessageType> {
-    let (input, package_type) = take(3usize)(s)?;
-
-    Ok((
-        input,
-        match package_type {
-            "100" => MessageType::Literal,
-            t => MessageType::Operator(u8::from_str_radix(t, 2).unwrap()),
-        },
-    ))
+fn take_package_type(s: &str) -> IResult<&str, u8> {
+    take(3usize)(s).map(|(i, p)| (i, u8::from_str_radix(p, 2).unwrap()))
 }
 
 fn take_literal_start(s: &str) -> IResult<&str, &str> {
@@ -131,31 +116,61 @@ fn take_n_subpackets(n: usize, s: &str) -> IResult<&str, Vec<Message>> {
 fn parse_message(input: &str) -> IResult<&str, Message> {
     let (input, (version, package_type)) = tuple((take_version, take_package_type))(input)?;
 
-    match package_type {
-        MessageType::Literal => {
+    let (input, contents) = match package_type {
+        0 => {
+            let (input, subpackets) = take_subpackets(input)?;
+            (input, MessageContents::Sum(subpackets))
+        }
+        1 => {
+            let (input, subpackets) = take_subpackets(input)?;
+            (input, MessageContents::Product(subpackets))
+        }
+        2 => {
+            let (input, subpackets) = take_subpackets(input)?;
+            (input, MessageContents::Minimum(subpackets))
+        }
+        3 => {
+            let (input, subpackets) = take_subpackets(input)?;
+            (input, MessageContents::Maximum(subpackets))
+        }
+        4 => {
             let (input, literal) = take_literal(input)?;
-            Ok((
-                input,
-                Message {
-                    version,
-                    package_type,
-                    contents: MessageContents::Literal(literal),
-                },
-            ))
+            (input, MessageContents::Literal(literal))
         }
-        MessageType::Operator(o) => {
-            let (input, length) = take_subpackets(input)?;
+        5 => {
+            let (input, subpackets) = take_subpackets(input)?;
+            (
+                input,
+                MessageContents::GreaterThan(
+                    Box::new(subpackets[0].clone()),
+                    Box::new(subpackets[1].clone()),
+                ),
+            )
+        }
+        6 => {
+            let (input, subpackets) = take_subpackets(input)?;
+            (
+                input,
+                MessageContents::LessThan(
+                    Box::new(subpackets[0].clone()),
+                    Box::new(subpackets[1].clone()),
+                ),
+            )
+        }
+        7 => {
+            let (input, subpackets) = take_subpackets(input)?;
+            (
+                input,
+                MessageContents::EqualTo(
+                    Box::new(subpackets[0].clone()),
+                    Box::new(subpackets[1].clone()),
+                ),
+            )
+        }
+        _ => fail(input)?,
+    };
 
-            Ok((
-                input,
-                Message {
-                    version,
-                    package_type: MessageType::Operator(o),
-                    contents: MessageContents::SubPackets(length),
-                },
-            ))
-        }
-    }
+    Ok((input, Message { version, contents }))
 }
 
 fn main() {
@@ -171,6 +186,42 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    impl Message {
+        fn get_as_literal(&self) -> Option<u64> {
+            match self.contents {
+                MessageContents::Literal(l) => Some(l),
+                _ => None,
+            }
+        }
+        fn get_message_type(&self) -> u8 {
+            match &self.contents {
+                MessageContents::Sum(_) => 0,
+                MessageContents::Product(_) => 1,
+                MessageContents::Minimum(_) => 2,
+                MessageContents::Maximum(_) => 3,
+                MessageContents::Literal(_) => 4,
+                MessageContents::GreaterThan(_, _) => 5,
+                MessageContents::LessThan(_, _) => 6,
+                MessageContents::EqualTo(_, _) => 7,
+            }
+        }
+
+        fn get_subpackets(&self) -> Option<Vec<Message>> {
+            match &self.contents {
+                MessageContents::Sum(subpackets)
+                | MessageContents::Product(subpackets)
+                | MessageContents::Minimum(subpackets)
+                | MessageContents::Maximum(subpackets) => Some(subpackets.clone()),
+                MessageContents::GreaterThan(message1, message2)
+                | MessageContents::LessThan(message1, message2)
+                | MessageContents::EqualTo(message1, message2) => {
+                    Some(vec![*message1.clone(), *message2.clone()])
+                }
+                MessageContents::Literal(_) => None,
+            }
+        }
+    }
 
     #[test]
     fn test_convert_to_bits() {
@@ -194,7 +245,6 @@ mod tests {
                 "000",
                 Message {
                     version: 6,
-                    package_type: MessageType::Literal,
                     contents: MessageContents::Literal(2021),
                 }
             ))
@@ -208,7 +258,7 @@ mod tests {
             .1;
 
         assert_eq!(message.version, 1);
-        assert_eq!(message.package_type, MessageType::Operator(6));
+        assert_eq!(message.get_message_type(), 6);
         assert_eq!(
             message.get_subpackets().unwrap()[0].get_as_literal(),
             Some(10)
@@ -227,7 +277,7 @@ mod tests {
             .1;
 
         assert_eq!(message.version, 7);
-        assert_eq!(message.package_type, MessageType::Operator(3));
+        assert_eq!(message.get_message_type(), 3);
         assert_eq!(
             message.get_subpackets().unwrap()[0].get_as_literal(),
             Some(1)
