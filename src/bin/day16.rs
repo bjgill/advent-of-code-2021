@@ -1,8 +1,8 @@
 use nom::{
     bytes::complete::{tag, take},
-    combinator::cond,
+    combinator::{cond, eof},
     error::{Error, ErrorKind},
-    multi::many_till,
+    multi::{many1, many_m_n, many_till},
     sequence::preceded,
     sequence::tuple,
     IResult,
@@ -17,20 +17,40 @@ fn convert_to_bits<S: Into<String>>(input: S) -> String {
         .join("")
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 struct Message {
     version: u8,
     package_type: MessageType,
     contents: MessageContents,
 }
 
-#[derive(Debug, PartialEq)]
+impl Message {
+    fn get_as_literal(&self) -> Option<u32> {
+        match self.contents {
+            MessageContents::Literal(l) => Some(l),
+            _ => None,
+        }
+    }
+
+    fn get_subpackets(&self) -> Option<Vec<Message>> {
+        match &self.contents {
+            MessageContents::SubPackets(l) => match l {
+                Length::SubPacketCount(subpackets) | Length::TotalLength(subpackets) => {
+                    Some(subpackets.clone())
+                }
+            },
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 enum MessageType {
     Literal,
     Operator(u8),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum MessageContents {
     Literal(u32),
     SubPackets(Length),
@@ -70,10 +90,10 @@ fn take_literal(s: &str) -> IResult<&str, u32> {
     Ok((input, literal))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum Length {
-    TotalLength(usize),
-    SubPacketCount(usize),
+    TotalLength(Vec<Message>),
+    SubPacketCount(Vec<Message>),
 }
 
 fn take_length(s: &str) -> IResult<&str, Length> {
@@ -85,19 +105,28 @@ fn take_length(s: &str) -> IResult<&str, Length> {
         Some(l) => {
             let length = usize::from_str_radix(l, 2).unwrap();
 
-            let (input, _subpackets) = take(length)(input)?;
+            let (input, subpackets) = take(length)(input)?;
 
-            Ok((input, Length::TotalLength(length)))
+            let (remainder, subpackets) = many1(parse_message)(subpackets)?;
+
+            let (_, _) = eof(remainder)?;
+
+            Ok((input, Length::TotalLength(subpackets)))
         }
         None => {
             let (input, subpacket_count) = take(11usize)(input)?;
 
-            Ok((
-                input,
-                Length::SubPacketCount(usize::from_str_radix(subpacket_count, 2).unwrap()),
-            ))
+            let subpacket_count = usize::from_str_radix(subpacket_count, 2).unwrap();
+
+            let (input, subpackets) = take_n_subpackets(subpacket_count, input)?;
+
+            Ok((input, Length::SubPacketCount(subpackets)))
         }
     }
+}
+
+fn take_n_subpackets(n: usize, s: &str) -> IResult<&str, Vec<Message>> {
+    many_m_n(n, n, parse_message)(s)
 }
 
 fn parse_message(input: &str) -> IResult<&str, Message> {
@@ -163,31 +192,43 @@ mod tests {
 
     #[test]
     fn test_parse_operator_total_length() {
+        let message = parse_message("00111000000000000110111101000101001010010001001000000000")
+            .unwrap()
+            .1;
+
+        assert_eq!(message.version, 1);
+        assert_eq!(message.package_type, MessageType::Operator(6));
         assert_eq!(
-            parse_message("00111000000000000110111101000101001010010001001000000000"),
-            Ok((
-                "0000000",
-                Message {
-                    version: 1,
-                    package_type: MessageType::Operator(6),
-                    contents: MessageContents::SubPackets(Length::TotalLength(27)),
-                }
-            ))
-        )
+            message.get_subpackets().unwrap()[0].get_as_literal(),
+            Some(10)
+        );
+        assert_eq!(
+            message.get_subpackets().unwrap()[1].get_as_literal(),
+            Some(20)
+        );
+        assert_eq!(message.get_subpackets().unwrap().len(), 2);
     }
 
     #[test]
     fn test_parse_operator_subpacket_count() {
+        let message = parse_message("11101110000000001101010000001100100000100011000001100000")
+            .unwrap()
+            .1;
+
+        assert_eq!(message.version, 7);
+        assert_eq!(message.package_type, MessageType::Operator(3));
         assert_eq!(
-            parse_message("11101110000000001101010000001100100000100011000001100000"),
-            Ok((
-                "01010000001100100000100011000001100000",
-                Message {
-                    version: 7,
-                    package_type: MessageType::Operator(3),
-                    contents: MessageContents::SubPackets(Length::SubPacketCount(3)),
-                }
-            ))
-        )
+            message.get_subpackets().unwrap()[0].get_as_literal(),
+            Some(1)
+        );
+        assert_eq!(
+            message.get_subpackets().unwrap()[1].get_as_literal(),
+            Some(2)
+        );
+        assert_eq!(
+            message.get_subpackets().unwrap()[2].get_as_literal(),
+            Some(3)
+        );
+        assert_eq!(message.get_subpackets().unwrap().len(), 3);
     }
 }
