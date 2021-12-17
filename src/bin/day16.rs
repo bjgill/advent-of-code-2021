@@ -1,7 +1,6 @@
 use nom::{
     bytes::complete::{tag, take},
     combinator::{cond, eof},
-    error::{Error, ErrorKind},
     multi::{many1, many_m_n, many_till},
     sequence::preceded,
     sequence::tuple,
@@ -12,7 +11,7 @@ fn convert_to_bits<S: Into<String>>(input: S) -> String {
     input
         .into()
         .chars()
-        .map(|c| format!("{:b}", u8::from_str_radix(&c.to_string(), 16).unwrap()))
+        .map(|c| format!("{:0>4b}", u8::from_str_radix(&c.to_string(), 16).unwrap()))
         .collect::<Vec<_>>()
         .join("")
 }
@@ -34,11 +33,7 @@ impl Message {
 
     fn get_subpackets(&self) -> Option<Vec<Message>> {
         match &self.contents {
-            MessageContents::SubPackets(l) => match l {
-                Length::SubPacketCount(subpackets) | Length::TotalLength(subpackets) => {
-                    Some(subpackets.clone())
-                }
-            },
+            MessageContents::SubPackets(s) => Some(s.clone()),
             _ => None,
         }
     }
@@ -53,7 +48,7 @@ enum MessageType {
 #[derive(Debug, PartialEq, Clone)]
 enum MessageContents {
     Literal(u32),
-    SubPackets(Length),
+    SubPackets(Vec<Message>),
 }
 
 fn take_version(s: &str) -> IResult<&str, u8> {
@@ -90,13 +85,7 @@ fn take_literal(s: &str) -> IResult<&str, u32> {
     Ok((input, literal))
 }
 
-#[derive(Debug, PartialEq, Clone)]
-enum Length {
-    TotalLength(Vec<Message>),
-    SubPacketCount(Vec<Message>),
-}
-
-fn take_length(s: &str) -> IResult<&str, Length> {
+fn take_subpackets(s: &str) -> IResult<&str, Vec<Message>> {
     let (input, length_type) = take(1usize)(s)?;
 
     let (input, length) = cond(length_type == "0", take(15usize))(input)?;
@@ -111,7 +100,7 @@ fn take_length(s: &str) -> IResult<&str, Length> {
 
             let (_, _) = eof(remainder)?;
 
-            Ok((input, Length::TotalLength(subpackets)))
+            Ok((input, subpackets))
         }
         None => {
             let (input, subpacket_count) = take(11usize)(input)?;
@@ -120,7 +109,7 @@ fn take_length(s: &str) -> IResult<&str, Length> {
 
             let (input, subpackets) = take_n_subpackets(subpacket_count, input)?;
 
-            Ok((input, Length::SubPacketCount(subpackets)))
+            Ok((input, subpackets))
         }
     }
 }
@@ -145,7 +134,7 @@ fn parse_message(input: &str) -> IResult<&str, Message> {
             ))
         }
         MessageType::Operator(o) => {
-            let (input, length) = take_length(input)?;
+            let (input, length) = take_subpackets(input)?;
 
             Ok((
                 input,
@@ -168,6 +157,10 @@ mod tests {
     #[test]
     fn test_convert_to_bits() {
         assert_eq!(convert_to_bits("9A"), "10011010");
+        assert_eq!(
+            convert_to_bits("EE00D40C823060"),
+            "11101110000000001101010000001100100000100011000001100000"
+        );
     }
 
     #[test]
@@ -230,5 +223,41 @@ mod tests {
             Some(3)
         );
         assert_eq!(message.get_subpackets().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn test_parse_nested_message() {
+        let message = parse_message(&convert_to_bits("8A004A801A8002F478"))
+            .unwrap()
+            .1;
+
+        assert_eq!(message.version, 4);
+        assert_eq!(message.get_subpackets().unwrap()[0].version, 1);
+        assert_eq!(
+            message.get_subpackets().unwrap()[0]
+                .get_subpackets()
+                .unwrap()[0]
+                .version,
+            5
+        );
+        assert_eq!(
+            message.get_subpackets().unwrap()[0]
+                .get_subpackets()
+                .unwrap()[0]
+                .get_subpackets()
+                .unwrap()[0]
+                .version,
+            6
+        );
+        assert_eq!(
+            message.get_subpackets().unwrap()[0]
+                .get_subpackets()
+                .unwrap()[0]
+                .get_subpackets()
+                .unwrap()[0]
+                .get_as_literal()
+                .is_some(),
+            true
+        );
     }
 }
