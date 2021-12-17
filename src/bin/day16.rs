@@ -24,7 +24,7 @@ struct Message {
 }
 
 impl Message {
-    fn get_as_literal(&self) -> Option<u32> {
+    fn get_as_literal(&self) -> Option<u64> {
         match self.contents {
             MessageContents::Literal(l) => Some(l),
             _ => None,
@@ -37,6 +37,16 @@ impl Message {
             _ => None,
         }
     }
+
+    fn get_version_sum(&self) -> u64 {
+        self.version as u64
+            + match &self.contents {
+                MessageContents::Literal(_) => 0,
+                MessageContents::SubPackets(subpackets) => {
+                    subpackets.iter().map(|s| s.get_version_sum()).sum()
+                }
+            }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -47,7 +57,7 @@ enum MessageType {
 
 #[derive(Debug, PartialEq, Clone)]
 enum MessageContents {
-    Literal(u32),
+    Literal(u64),
     SubPackets(Vec<Message>),
 }
 
@@ -77,10 +87,10 @@ fn take_literal_end(s: &str) -> IResult<&str, &str> {
     preceded(tag("0"), take(4usize))(s)
 }
 
-fn take_literal(s: &str) -> IResult<&str, u32> {
+fn take_literal(s: &str) -> IResult<&str, u64> {
     let (input, (start, end)) = many_till(take_literal_start, take_literal_end)(s)?;
 
-    let literal = u32::from_str_radix(&(start.join("") + end), 2).unwrap();
+    let literal = u64::from_str_radix(&(start.join("") + end), 2).unwrap();
 
     Ok((input, literal))
 }
@@ -148,7 +158,15 @@ fn parse_message(input: &str) -> IResult<&str, Message> {
     }
 }
 
-fn main() {}
+fn main() {
+    let data = std::fs::read_to_string("data/day16.txt").unwrap();
+    let message_string = convert_to_bits(data);
+
+    println!(
+        "Version sum: {}",
+        parse_message(&message_string).unwrap().1.get_version_sum()
+    );
+}
 
 #[cfg(test)]
 mod tests {
@@ -259,5 +277,6 @@ mod tests {
                 .is_some(),
             true
         );
+        assert_eq!(message.get_version_sum(), 16);
     }
 }
