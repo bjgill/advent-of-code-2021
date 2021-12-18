@@ -73,7 +73,10 @@ fn main() {
         (target_region.max_y_initial_velocity() * (target_region.max_y_initial_velocity() + 1)) / 2
     );
 
-    println!("Total intersecting trajectories: {}", target_region.get_count_of_intersecting_trajectories());
+    println!(
+        "Total intersecting trajectories: {}",
+        target_region.get_count_of_intersecting_trajectories()
+    );
 }
 
 #[cfg(test)]
