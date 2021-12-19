@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -183,6 +184,17 @@ fn main() {
         elements
             .fold(first_element, |acc, e| acc + e)
             .get_magnitude()
+    );
+
+    let element_pairs = data
+        .split('\n')
+        .map(|s| s.parse::<Element>().unwrap())
+        .permutations(2);
+    println!(
+        "Maximum magnitude: {:?}",
+        element_pairs
+            .map(|v| (v[0].clone() + v[1].clone()).get_magnitude())
+            .max()
     );
 }
 
