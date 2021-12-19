@@ -22,12 +22,8 @@ enum Element {
 impl fmt::Debug for Element {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Element::Pair { left, right } => {
-                f.debug_list().entry(left).entry(right).finish()
-            }
-            Element::Number(number) => {
-                f.write_fmt(format_args!("{}",number))
-            }
+            Element::Pair { left, right } => f.debug_list().entry(left).entry(right).finish(),
+            Element::Number(number) => f.write_fmt(format_args!("{}", number)),
         }
     }
 }
@@ -76,10 +72,18 @@ impl std::ops::Add for Element {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        Element::Pair {
+        let mut element = Element::Pair {
             left: Box::new(self),
             right: Box::new(other),
+        };
+
+        loop {
+            if element.explode_if_necessary().is_none() && element.split().is_none() {
+                break;
+            }
         }
+
+        element
     }
 }
 
@@ -110,12 +114,17 @@ impl Element {
         }
     }
 
+    fn get_magnitude(&self) -> u32 {
+        match self {
+            Element::Pair { left, right } => 3 * left.get_magnitude() + 2 * right.get_magnitude(),
+            Element::Number(number) => *number,
+        }
+    }
+
     fn explode_if_nested_four_times(&mut self, nesting: u32) -> Option<(Option<u32>, Option<u32>)> {
         match self {
             Element::Pair { left, right } if nesting == 4 => {
                 // explode
-                eprintln!("Explode");
-
                 if let (Element::Number(left_value), Element::Number(right_value)) =
                     (*left.clone(), *right.clone())
                 {
@@ -147,6 +156,34 @@ impl Element {
             Element::Number(_) => None,
         }
     }
+
+    fn split(&mut self) -> Option<()> {
+        match self {
+            Element::Pair { left, right } => left.split().or_else(|| right.split()),
+            Element::Number(number) if *number >= 10 => {
+                *self = Element::Pair {
+                    left: Box::new(Element::Number((*number) / 2)),
+                    right: Box::new(Element::Number((*number + 1) / 2)),
+                };
+
+                Some(())
+            }
+            Element::Number(_) => None,
+        }
+    }
+}
+
+fn main() {
+    let data = std::fs::read_to_string("data/day18.txt").unwrap();
+    let mut elements = data.split('\n').map(|s| s.parse::<Element>().unwrap());
+    let first_element = elements.next().unwrap();
+
+    println!(
+        "Magnitude of sum: {}",
+        elements
+            .fold(first_element, |acc, e| acc + e)
+            .get_magnitude()
+    );
 }
 
 #[cfg(test)]
@@ -210,6 +247,49 @@ mod tests {
         assert_eq!(
             element,
             "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]".parse().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_split() {
+        let mut element = "10".parse::<Element>().unwrap();
+        assert_eq!(element.split(), Some(()));
+        assert_eq!(element, "[5,5]".parse().unwrap());
+
+        let mut element = "11".parse::<Element>().unwrap();
+        assert_eq!(element.split(), Some(()));
+        assert_eq!(element, "[5,6]".parse().unwrap());
+    }
+
+    #[test]
+    fn test_addition_with_post_processing() {
+        assert_eq!(
+            "[[[[4,3],4],4],[7,[[8,4],9]]]".parse::<Element>().unwrap()
+                + "[1,1]".parse::<Element>().unwrap(),
+            "[[[[0,7],4],[[7,8],[6,0]]],[8,1]]"
+                .parse::<Element>()
+                .unwrap()
+        );
+
+        assert_eq!(
+            "[[[[7,7],[7,7]],[[8,7],[8,7]]],[[[7,0],[7,7]],9]]"
+                .parse::<Element>()
+                .unwrap()
+                + "[[[[4,2],2],6],[8,7]]".parse::<Element>().unwrap(),
+            "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]"
+                .parse::<Element>()
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_magnitude() {
+        assert_eq!(
+            "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]"
+                .parse::<Element>()
+                .unwrap()
+                .get_magnitude(),
+            3488
         );
     }
 }
